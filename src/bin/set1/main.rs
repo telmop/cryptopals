@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
 fn challenge1() {
     let x = cryptopals::hexstr_to_bytes("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d").unwrap();
@@ -45,11 +48,8 @@ fn count_matches(chars: &[char]) -> u32 {
     matches
 }
 
-fn challenge3() {
-    let bytes = cryptopals::hexstr_to_bytes(
-        "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736",
-    )
-    .unwrap();
+fn find_best_key(hexstr: &str) -> (u8, u32) {
+    let bytes = cryptopals::hexstr_to_bytes(hexstr).unwrap();
     let mut best_matches = 0;
     let mut best_key = 0;
     for mask in 0_u8..=255_u8 {
@@ -70,6 +70,13 @@ fn challenge3() {
             }
         }
     }
+    (best_key, best_matches)
+}
+
+fn challenge3() {
+    let hexstr = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
+    let (best_key, best_matches) = find_best_key(hexstr);
+    let bytes = cryptopals::hexstr_to_bytes(hexstr).unwrap();
     let decrypted = String::from_utf8(cryptopals::sliding_xor(&bytes, &vec![best_key])).unwrap();
     println!(
         "Best key: {} ({}); #matches: {}; decrypted: {}",
@@ -77,13 +84,33 @@ fn challenge3() {
     );
 }
 
+fn challenge4() {
+    let f = File::open(PathBuf::from("data/4.txt")).expect("Couldn't open file");
+    let reader = BufReader::new(f);
+    let mut highest_matches = 0;
+    let mut guess_line = "".to_string();
+    let mut key = 0;
+    for line_result in reader.lines() {
+        let line = line_result.expect("Error reading line.");
+        let (best_key, best_matches) = find_best_key(&line);
+        if best_matches > highest_matches {
+            highest_matches = best_matches;
+            key = best_key;
+            guess_line = line;
+        }
+    }
+    let bytes = cryptopals::hexstr_to_bytes(&guess_line).unwrap();
+    let decrypted = String::from_utf8(cryptopals::sliding_xor(&bytes, &vec![key])).unwrap();
+    println!(
+        "{} -> `{}`; Key: {} ({}); Matches: {}",
+        guess_line, decrypted, key as char, key, highest_matches
+    );
+}
+
 fn main() {
-    println!("Running challenge 1");
-    challenge1();
-
-    println!("Running challenge 2");
-    challenge2();
-
-    println!("Running challenge 3");
-    challenge3();
+    let challenges = [challenge1, challenge2, challenge3, challenge4];
+    for (i, challenge) in challenges.iter().enumerate() {
+        println!("Running challenge {}", i + 1);
+        challenge();
+    }
 }
