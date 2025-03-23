@@ -107,8 +107,18 @@ fn challenge4() {
     );
 }
 
+fn challenge5() {
+    let message = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+    let key = "ICE";
+    let key_bytes = key.as_bytes();
+    let msg_bytes = message.as_bytes();
+    let encrypted_bytes = cryptopals::sliding_xor(msg_bytes, key_bytes);
+    let encrypted = cryptopals::bytes_to_hexstr(&encrypted_bytes);
+    assert_eq!(encrypted, "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f");
+}
+
 fn main() {
-    let challenges = [challenge1, challenge2, challenge3, challenge4];
+    let challenges = [challenge1, challenge2, challenge3, challenge4, challenge5];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 1);
         challenge();

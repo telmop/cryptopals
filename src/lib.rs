@@ -1,6 +1,5 @@
 use std::fmt::Write;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
-type Bytes = Vec<u8>;
 
 fn byte_to_b64ascii(byte: u8) -> u8 {
     match byte {
@@ -13,7 +12,7 @@ fn byte_to_b64ascii(byte: u8) -> u8 {
     }
 }
 
-pub fn b64encode(bytes: &Bytes) -> Result<String> {
+pub fn b64encode(bytes: &[u8]) -> Result<String> {
     let mut encoded = vec![];
     let mut buf: u8 = 0;
     for (i, b) in bytes.iter().enumerate() {
@@ -47,7 +46,7 @@ pub fn b64encode(bytes: &Bytes) -> Result<String> {
     Ok(String::from_utf8(encoded)?)
 }
 
-pub fn hexstr_to_bytes(hex: &str) -> Result<Bytes> {
+pub fn hexstr_to_bytes(hex: &str) -> Result<Vec<u8>> {
     let mut s = hex.to_string();
     if s.len() % 2 == 1 {
         s.insert(0, '0');
@@ -60,7 +59,7 @@ pub fn hexstr_to_bytes(hex: &str) -> Result<Bytes> {
     Ok(result)
 }
 
-pub fn bytes_to_hexstr(bytes: &Bytes) -> String {
+pub fn bytes_to_hexstr(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(2 * bytes.len());
     for b in bytes {
         write!(&mut s, "{:02x}", b).unwrap();
@@ -68,7 +67,7 @@ pub fn bytes_to_hexstr(bytes: &Bytes) -> String {
     s
 }
 
-pub fn xor(bytes1: &Bytes, bytes2: &Bytes) -> Result<Bytes> {
+pub fn xor(bytes1: &[u8], bytes2: &[u8]) -> Result<Vec<u8>> {
     if bytes1.len() != bytes2.len() {
         return Err("Lengths must match!".into());
     }
@@ -79,7 +78,7 @@ pub fn xor(bytes1: &Bytes, bytes2: &Bytes) -> Result<Bytes> {
     Ok(output)
 }
 
-pub fn sliding_xor(message: &Bytes, mask: &Bytes) -> Bytes {
+pub fn sliding_xor(message: &[u8], mask: &[u8]) -> Vec<u8> {
     assert!(mask.len() <= message.len());
     let mut result = Vec::with_capacity(message.len());
     for i in 0..message.len() {
