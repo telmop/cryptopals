@@ -1,8 +1,6 @@
 use std::fmt::Write;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
-// TODO: Add tests.
-
 fn byte_to_b64ascii(byte: u8) -> u8 {
     match byte {
         0..=25 => b'A' + byte,
@@ -148,4 +146,19 @@ pub fn sliding_xor(message: &[u8], mask: &[u8]) -> Vec<u8> {
         result.push(message[i] ^ mask[mask_idx]);
     }
     result
+}
+
+
+// ***** TESTS *****
+
+#[test]
+fn test_base64_identity() {
+    let test_cases = vec!["M", "Ma", "Man", "Many things"];
+    for test_case in test_cases {
+        let bytes = test_case.as_bytes();
+        let encoded = b64encode(bytes).unwrap();
+        let decoded = b64decode(&encoded).unwrap();
+        let decoded_str = String::from_utf8(decoded).unwrap();
+        assert_eq!(test_case, decoded_str);
+    }
 }

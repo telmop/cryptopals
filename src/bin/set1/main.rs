@@ -117,8 +117,19 @@ fn challenge5() {
     assert_eq!(encrypted, "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f");
 }
 
+fn challenge6() {
+    let s = "M".as_bytes();
+    let encoded = cryptopals::b64encode(s).unwrap();
+    println!("Encoded: {}", encoded);
+    let decoded = cryptopals::b64decode(&encoded).unwrap();
+    let decoded_str = String::from_utf8(decoded).unwrap();
+    println!("Decoded: {}", decoded_str);
+}
+
 fn main() {
-    let challenges = [challenge1, challenge2, challenge3, challenge4, challenge5];
+    let challenges = [
+        challenge1, challenge2, challenge3, challenge4, challenge5, challenge6,
+    ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 1);
         challenge();
