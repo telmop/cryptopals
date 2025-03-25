@@ -1,6 +1,8 @@
 use std::fmt::Write;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
+// TODO: Add tests.
+
 fn byte_to_b64ascii(byte: u8) -> u8 {
     match byte {
         0..=25 => b'A' + byte,
