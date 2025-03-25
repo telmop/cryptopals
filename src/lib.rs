@@ -99,7 +99,7 @@ pub fn b64decode(encoded: &str) -> Result<Vec<u8>> {
                 }
                 decoded.push(buf + value);
                 buf = 0;
-            },
+            }
             _ => panic!("Impossible"),
         }
     }
@@ -148,6 +148,14 @@ pub fn sliding_xor(message: &[u8], mask: &[u8]) -> Vec<u8> {
     result
 }
 
+fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> u32 {
+    assert_eq!(bytes1.len(), bytes2.len());
+    let mut distance = 0;
+    for (b1, b2) in bytes1.iter().zip(bytes2) {
+        distance += (b1 ^ b2).count_ones();
+    }
+    distance
+}
 
 // ***** TESTS *****
 
@@ -161,4 +169,12 @@ fn test_base64_identity() {
         let decoded_str = String::from_utf8(decoded).unwrap();
         assert_eq!(test_case, decoded_str);
     }
+}
+
+#[test]
+fn test_hamming_distance() {
+    let bytes1 = "this is a test".as_bytes();
+    let bytes2 = "wokka wokka!!!".as_bytes();
+    let distance = hamming_distance(bytes1, bytes2);
+    assert_eq!(distance, 37);
 }
