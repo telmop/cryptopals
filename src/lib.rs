@@ -148,7 +148,7 @@ pub fn sliding_xor(message: &[u8], mask: &[u8]) -> Vec<u8> {
     result
 }
 
-fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> u32 {
+pub fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> u32 {
     assert_eq!(bytes1.len(), bytes2.len());
     let mut distance = 0;
     for (b1, b2) in bytes1.iter().zip(bytes2) {
