@@ -1,3 +1,4 @@
+use openssl::symm::{decrypt, Cipher};
 use std::fmt::Write;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -169,6 +170,10 @@ pub fn from_base64_file(filename: &Path) -> Result<Vec<u8>> {
     // Remove new lines, if any.
     encoded = encoded.replace("\r\n", "").replace("\n", "");
     b64decode(&encoded)
+}
+
+pub fn decrypt_aes_ecb(ciphertext: &[u8], key: &[u8]) -> Vec<u8> {
+    decrypt(Cipher::aes_128_ecb(), key, None, ciphertext).unwrap()
 }
 
 // ***** TESTS *****

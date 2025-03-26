@@ -221,9 +221,16 @@ fn challenge6() {
     );
 }
 
+fn challenge7() {
+    let key = "YELLOW SUBMARINE".as_bytes();
+    let ciphertext = cryptopals::from_base64_file(&PathBuf::from("data/7.txt")).unwrap();
+    let decrypted = String::from_utf8(cryptopals::decrypt_aes_ecb(&ciphertext, key)).unwrap();
+    println!("Decrypted text: {}", decrypted);
+}
+
 fn main() {
     let challenges = [
-        challenge1, challenge2, challenge3, challenge4, challenge5, challenge6,
+        challenge1, challenge2, challenge3, challenge4, challenge5, challenge6, challenge7,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 1);
