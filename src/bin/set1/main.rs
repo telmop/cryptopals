@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::iter::Sum;
 use std::path::PathBuf;
 
@@ -168,12 +168,7 @@ where
 }
 
 fn challenge6() {
-    let f = File::open(PathBuf::from("data/6.txt")).expect("Couldn't open file");
-    let mut reader = BufReader::new(f);
-    let mut encrypted = String::new();
-    let _ = reader.read_to_string(&mut encrypted);
-    encrypted = encrypted.replace("\r\n", "").replace("\n", "");
-    let bytes = cryptopals::b64decode(&encrypted).unwrap();
+    let bytes = cryptopals::from_base64_file(&PathBuf::from("data/6.txt")).unwrap();
 
     /*
     Explanation for this part:

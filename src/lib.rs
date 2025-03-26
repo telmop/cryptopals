@@ -1,4 +1,8 @@
 use std::fmt::Write;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::Path;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 fn byte_to_b64ascii(byte: u8) -> u8 {
@@ -155,6 +159,16 @@ pub fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> u32 {
         distance += (b1 ^ b2).count_ones();
     }
     distance
+}
+
+pub fn from_base64_file(filename: &Path) -> Result<Vec<u8>> {
+    let f = File::open(filename).expect("Couldn't open file");
+    let mut reader = BufReader::new(f);
+    let mut encoded = String::new();
+    let _ = reader.read_to_string(&mut encoded);
+    // Remove new lines, if any.
+    encoded = encoded.replace("\r\n", "").replace("\n", "");
+    b64decode(&encoded)
 }
 
 // ***** TESTS *****
