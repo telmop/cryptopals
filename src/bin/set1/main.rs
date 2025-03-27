@@ -6,8 +6,8 @@ use std::iter::Sum;
 use std::path::PathBuf;
 
 fn challenge1() {
-    let x = cryptopals::hexstr_to_bytes("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d").unwrap();
-    let encoded = cryptopals::b64encode(&x).unwrap();
+    let x = cryptopals::encoding::hexstr_to_bytes("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d").unwrap();
+    let encoded = cryptopals::encoding::b64encode(&x).unwrap();
     assert_eq!(
         encoded,
         "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
@@ -15,10 +15,12 @@ fn challenge1() {
 }
 
 fn challenge2() {
-    let bytes1 = cryptopals::hexstr_to_bytes("1c0111001f010100061a024b53535009181c").unwrap();
-    let bytes2 = cryptopals::hexstr_to_bytes("686974207468652062756c6c277320657965").unwrap();
-    let result = cryptopals::xor(&bytes1, &bytes2).unwrap();
-    let result_str = cryptopals::bytes_to_hexstr(&result);
+    let bytes1 =
+        cryptopals::encoding::hexstr_to_bytes("1c0111001f010100061a024b53535009181c").unwrap();
+    let bytes2 =
+        cryptopals::encoding::hexstr_to_bytes("686974207468652062756c6c277320657965").unwrap();
+    let result = cryptopals::stream::xor(&bytes1, &bytes2).unwrap();
+    let result_str = cryptopals::encoding::bytes_to_hexstr(&result);
     assert_eq!(result_str, "746865206b696420646f6e277420706c6179");
 }
 
@@ -71,7 +73,7 @@ fn find_best_key(bytes: &[u8]) -> (u8, u32) {
     let mut best_score = 0;
     let mut best_key = 0;
     for mask in 0_u8..=255_u8 {
-        let decrypted = cryptopals::sliding_xor(&bytes, &vec![mask]);
+        let decrypted = cryptopals::stream::sliding_xor(&bytes, &vec![mask]);
         match String::from_utf8(decrypted) {
             Err(_) => {
                 continue;
@@ -92,9 +94,10 @@ fn find_best_key(bytes: &[u8]) -> (u8, u32) {
 
 fn challenge3() {
     let hexstr = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
-    let bytes = cryptopals::hexstr_to_bytes(hexstr).unwrap();
+    let bytes = cryptopals::encoding::hexstr_to_bytes(hexstr).unwrap();
     let (best_key, best_score) = find_best_key(&bytes);
-    let decrypted = String::from_utf8(cryptopals::sliding_xor(&bytes, &vec![best_key])).unwrap();
+    let decrypted =
+        String::from_utf8(cryptopals::stream::sliding_xor(&bytes, &vec![best_key])).unwrap();
     println!(
         "Best key: {} ({}); score: {}; decrypted: {}",
         best_key as char, best_key, best_score, decrypted
@@ -109,7 +112,7 @@ fn challenge4() {
     let mut key = 0;
     for line_result in reader.lines() {
         let line = line_result.expect("Error reading line.");
-        let bytes = cryptopals::hexstr_to_bytes(&line).unwrap();
+        let bytes = cryptopals::encoding::hexstr_to_bytes(&line).unwrap();
         let (best_key, best_score) = find_best_key(&bytes);
         if best_score > highest_score {
             highest_score = best_score;
@@ -117,8 +120,8 @@ fn challenge4() {
             guess_line = line;
         }
     }
-    let bytes = cryptopals::hexstr_to_bytes(&guess_line).unwrap();
-    let decrypted = String::from_utf8(cryptopals::sliding_xor(&bytes, &vec![key])).unwrap();
+    let bytes = cryptopals::encoding::hexstr_to_bytes(&guess_line).unwrap();
+    let decrypted = String::from_utf8(cryptopals::stream::sliding_xor(&bytes, &vec![key])).unwrap();
     println!(
         "{} -> `{}`; Key: {} ({}); Matches: {}",
         guess_line, decrypted, key as char, key, highest_score
@@ -130,8 +133,8 @@ fn challenge5() {
     let key = "ICE";
     let key_bytes = key.as_bytes();
     let msg_bytes = message.as_bytes();
-    let encrypted_bytes = cryptopals::sliding_xor(msg_bytes, key_bytes);
-    let encrypted = cryptopals::bytes_to_hexstr(&encrypted_bytes);
+    let encrypted_bytes = cryptopals::stream::sliding_xor(msg_bytes, key_bytes);
+    let encrypted = cryptopals::encoding::bytes_to_hexstr(&encrypted_bytes);
     assert_eq!(encrypted, "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f");
 }
 
@@ -168,7 +171,7 @@ where
 }
 
 fn challenge6() {
-    let bytes = cryptopals::from_base64_file(&PathBuf::from("data/6.txt")).unwrap();
+    let bytes = cryptopals::encoding::from_base64_file(&PathBuf::from("data/6.txt")).unwrap();
 
     /*
     Explanation for this part:
@@ -192,7 +195,7 @@ fn challenge6() {
             for j in (i + 1)..4 {
                 let first = &bytes[i * key_size..(i + 1) * key_size];
                 let second = &bytes[j * key_size..(j + 1) * key_size];
-                dist += cryptopals::hamming_distance(first, second);
+                dist += cryptopals::stream::hamming_distance(first, second);
             }
         }
         let normalized_avg_dist = (dist as f32) / (key_size as f32);
@@ -208,7 +211,7 @@ fn challenge6() {
     for (key_size, _) in keys_to_consider {
         let (key, scores) = find_best_multibyte_key(&bytes, *key_size);
         let avg_score = average(&scores);
-        let decrypted = String::from_utf8(cryptopals::sliding_xor(&bytes, &key));
+        let decrypted = String::from_utf8(cryptopals::stream::sliding_xor(&bytes, &key));
         if avg_score > best_score {
             best_score = avg_score;
             decrypted_msg = decrypted.unwrap_or("Oopsie, check what happened".to_string());
@@ -223,8 +226,9 @@ fn challenge6() {
 
 fn challenge7() {
     let key = "YELLOW SUBMARINE".as_bytes();
-    let ciphertext = cryptopals::from_base64_file(&PathBuf::from("data/7.txt")).unwrap();
-    let decrypted = String::from_utf8(cryptopals::decrypt_aes_ecb(&ciphertext, key)).unwrap();
+    let ciphertext = cryptopals::encoding::from_base64_file(&PathBuf::from("data/7.txt")).unwrap();
+    let decrypted =
+        String::from_utf8(cryptopals::stream::decrypt_aes_ecb(&ciphertext, key)).unwrap();
     println!("Decrypted text: {}", decrypted);
 }
 
@@ -246,7 +250,7 @@ fn challenge8() {
     let mut expected_blocks: usize = 0;
     for line_result in reader.lines() {
         let line = line_result.expect("Error reading line.");
-        let bytes = cryptopals::hexstr_to_bytes(&line).unwrap();
+        let bytes = cryptopals::encoding::hexstr_to_bytes(&line).unwrap();
         expected_blocks = bytes.len() / 16;
         let unique = count_unique_blocks(&bytes, 16);
         if unique < min_blocks {
