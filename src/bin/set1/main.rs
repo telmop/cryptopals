@@ -228,9 +228,42 @@ fn challenge7() {
     println!("Decrypted text: {}", decrypted);
 }
 
+fn count_unique_blocks(bytes: &[u8], block_size: usize) -> usize {
+    assert!(block_size > 0);
+    let mut unique_blocks = HashSet::new();
+    for i in 0..(bytes.len() / block_size) {
+        let block = &bytes[i * block_size..(i + 1) * block_size];
+        unique_blocks.insert(block);
+    }
+    unique_blocks.len()
+}
+
+fn challenge8() {
+    let f = File::open(PathBuf::from("data/8.txt")).expect("Couldn't open file");
+    let reader = BufReader::new(f);
+    let mut min_blocks = std::usize::MAX;
+    let mut ecb_line = String::new();
+    let mut expected_blocks: usize = 0;
+    for line_result in reader.lines() {
+        let line = line_result.expect("Error reading line.");
+        let bytes = cryptopals::hexstr_to_bytes(&line).unwrap();
+        expected_blocks = bytes.len() / 16;
+        let unique = count_unique_blocks(&bytes, 16);
+        if unique < min_blocks {
+            min_blocks = unique;
+            ecb_line = line;
+        }
+    }
+    println!(
+        "Expected: {}; Found: {}. Line: {}",
+        expected_blocks, min_blocks, ecb_line
+    );
+}
+
 fn main() {
     let challenges = [
         challenge1, challenge2, challenge3, challenge4, challenge5, challenge6, challenge7,
+        challenge8,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 1);
