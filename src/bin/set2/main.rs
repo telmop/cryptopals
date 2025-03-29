@@ -1,3 +1,7 @@
+use cryptopals::encoding;
+use cryptopals::encryption;
+use std::path::PathBuf;
+
 fn pkcs7_padding(bytes: &[u8], block_size: u8) -> Vec<u8> {
     assert!((block_size as usize) >= bytes.len());
     if bytes.len() == (block_size as usize) {
@@ -19,8 +23,17 @@ fn challenge9() {
     println!("{:?}", s);
 }
 
+fn challenge10() {
+    let encrypted = encoding::from_base64_file(&PathBuf::from("data/10.txt")).unwrap();
+    let key = "YELLOW SUBMARINE".as_bytes();
+    let iv = [0_u8; 16];
+    let decrypted_bytes = encryption::decrypt_aes_cbc(&encrypted, &key, &iv).unwrap();
+    let decrypted = String::from_utf8(decrypted_bytes).unwrap();
+    println!("{}", decrypted);
+}
+
 fn main() {
-    let challenges = [challenge9];
+    let challenges = [challenge9, challenge10];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 1);
         challenge();

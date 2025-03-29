@@ -1,4 +1,4 @@
-use openssl::symm::{decrypt, Cipher};
+use openssl::symm::{decrypt, Cipher, Crypter, Mode};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
@@ -32,8 +32,40 @@ pub fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> u32 {
     distance
 }
 
-pub fn decrypt_aes_ecb(ciphertext: &[u8], key: &[u8]) -> Vec<u8> {
-    decrypt(Cipher::aes_128_ecb(), key, None, ciphertext).unwrap()
+pub fn decrypt_aes_ecb(ciphertext: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    Ok(decrypt(Cipher::aes_128_ecb(), key, None, ciphertext)?)
+}
+
+pub fn decrypt_aes_block(block: &[u8], key: &[u8]) -> Result<[u8; 16]> {
+    assert_eq!(block.len(), 16);
+    assert_eq!(key.len(), 16);
+
+    let mut crypter = Crypter::new(Cipher::aes_128_ecb(), Mode::Decrypt, key, None)?;
+    // Important! Disable padding, otherwise decryption will fail since our block doesn't have valid padding.
+    crypter.pad(false);
+
+    // Output buffer must be at least 32 bytes, otherwise OpenSSL complains.
+    let mut out = [0u8; 32];
+    let count = crypter.update(block, &mut out)?;
+    crypter.finalize(&mut out[count..])?;
+
+    Ok(out[..16].try_into().unwrap())
+}
+
+pub fn decrypt_aes_cbc(cyphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
+    assert_eq!(key.len(), iv.len());
+    let block_size = iv.len();
+    let mut cur_iv = iv.to_vec();
+    let mut decoded_msg = Vec::<u8>::with_capacity(cyphertext.len());
+    assert_eq!(cyphertext.len() % block_size, 0);
+    for i in (0..cyphertext.len()).step_by(block_size) {
+        let block = &cyphertext[i..i + block_size];
+        let decrypted = decrypt_aes_block(block, key)?;
+        let mut decoded_block = xor(&decrypted, &cur_iv)?;
+        decoded_msg.append(&mut decoded_block);
+        cur_iv = block.to_vec();
+    }
+    Ok(decoded_msg)
 }
 
 // ***** TESTS *****
