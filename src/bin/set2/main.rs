@@ -25,15 +25,23 @@ fn challenge9() {
 
 fn challenge10() {
     let encrypted = encoding::from_base64_file(&PathBuf::from("data/10.txt")).unwrap();
+    println!("{:?}", &encrypted);
     let key = "YELLOW SUBMARINE".as_bytes();
     let iv = [0_u8; 16];
     let decrypted_bytes = encryption::decrypt_aes_cbc(&encrypted, &key, &iv).unwrap();
-    let decrypted = String::from_utf8(decrypted_bytes).unwrap();
+    let decrypted = String::from_utf8(decrypted_bytes.clone()).unwrap();
     println!("{}", decrypted);
+    let encr_new = encryption::encrypt_aes_cbc(&decrypted_bytes, key, &iv);
+    println!("{:?}", encr_new);
+}
+
+fn challenge11() {
+    let random = encryption::random_aes128_block();
+    println!("{:?}", random);
 }
 
 fn main() {
-    let challenges = [challenge9, challenge10];
+    let challenges = [challenge9, challenge10, challenge11];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 1);
         challenge();
