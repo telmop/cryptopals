@@ -1,5 +1,6 @@
 use cryptopals::encoding;
 use cryptopals::encryption;
+use cryptopals::utils;
 use std::path::PathBuf;
 
 fn pkcs7_padding(bytes: &[u8], block_size: u8) -> Vec<u8> {
@@ -31,13 +32,28 @@ fn challenge10() {
     let decrypted_bytes = encryption::decrypt_aes_cbc(&encrypted, &key, &iv).unwrap();
     let decrypted = String::from_utf8(decrypted_bytes.clone()).unwrap();
     println!("{}", decrypted);
-    let encr_new = encryption::encrypt_aes_cbc(&decrypted_bytes, key, &iv);
-    println!("{:?}", encr_new);
+}
+
+// `true` is ECB, `false` is CBC.
+fn detect_ecb(ciphertext: &[u8], block_size: usize) -> bool {
+    let num_blocks = ciphertext.len() / block_size;
+    num_blocks != utils::count_unique_blocks(ciphertext, block_size)
 }
 
 fn challenge11() {
-    let random = encryption::random_aes128_block();
-    println!("{:?}", random);
+    let msg = "This is a test sentence".repeat(50).into_bytes();
+    let num_iter = 100;
+    for _ in 0..num_iter {
+        let (encrypted, is_ecb) = encryption::random_encrypt(&msg);
+        assert_eq!(
+            detect_ecb(&encrypted, encryption::AES128_BLOCK_SIZE),
+            is_ecb
+        );
+    }
+    println!(
+        "Correctly predicted {} instances of random encryption.",
+        num_iter
+    );
 }
 
 fn main() {
