@@ -1,6 +1,8 @@
 use cryptopals::encoding;
 use cryptopals::encryption;
+use cryptopals::encryption::AES128_BLOCK_SIZE;
 use cryptopals::utils;
+use rand::Rng;
 use std::path::PathBuf;
 
 fn pkcs7_padding(bytes: &[u8], block_size: u8) -> Vec<u8> {
@@ -40,11 +42,39 @@ fn detect_ecb(ciphertext: &[u8], block_size: usize) -> bool {
     num_blocks != utils::count_unique_blocks(ciphertext, block_size)
 }
 
+fn random_encrypt(ciphertext: &[u8]) -> (Vec<u8>, bool) {
+    let mut rng = rand::rng();
+    let num_bytes_before: usize = rng.random_range(5..=10);
+    let bytes_before = encryption::get_random_bytes(num_bytes_before);
+    let num_bytes_after: usize = rng.random_range(5..=10);
+    let bytes_after = encryption::get_random_bytes(num_bytes_after);
+    let mut cipher_vec = Vec::with_capacity(ciphertext.len() + num_bytes_before + num_bytes_after);
+    cipher_vec.extend(bytes_before);
+    cipher_vec.extend_from_slice(ciphertext);
+    cipher_vec.extend(bytes_after);
+
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+    if rng.random() {
+        // CBC.
+        let iv = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+        (
+            encryption::encrypt_aes_cbc(&cipher_vec, &key, &iv).unwrap(),
+            false,
+        )
+    } else {
+        // ECB.
+        (
+            encryption::encrypt_aes_ecb(&cipher_vec, &key).unwrap(),
+            true,
+        )
+    }
+}
+
 fn challenge11() {
     let msg = "This is a test sentence".repeat(50).into_bytes();
     let num_iter = 100;
     for _ in 0..num_iter {
-        let (encrypted, is_ecb) = encryption::random_encrypt(&msg);
+        let (encrypted, is_ecb) = random_encrypt(&msg);
         assert_eq!(
             detect_ecb(&encrypted, encryption::AES128_BLOCK_SIZE),
             is_ecb

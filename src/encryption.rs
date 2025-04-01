@@ -1,5 +1,4 @@
 use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
-use rand::Rng;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 pub const AES128_BLOCK_SIZE: usize = 16;
@@ -34,12 +33,12 @@ pub fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> u32 {
     distance
 }
 
-pub fn decrypt_aes_ecb(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
-    Ok(decrypt(Cipher::aes_128_ecb(), key, iv, ciphertext)?)
+pub fn decrypt_aes_ecb(ciphertext: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    Ok(decrypt(Cipher::aes_128_ecb(), key, None, ciphertext)?)
 }
 
-pub fn encrypt_aes_ecb(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
-    Ok(encrypt(Cipher::aes_128_ecb(), key, iv, ciphertext)?)
+pub fn encrypt_aes_ecb(ciphertext: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    Ok(encrypt(Cipher::aes_128_ecb(), key, None, ciphertext)?)
 }
 
 pub fn decrypt_aes_block(block: &[u8], key: &[u8]) -> Result<[u8; 16]> {
@@ -82,7 +81,7 @@ pub fn decrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     Ok(decoded_msg)
 }
 
-fn get_random_bytes(num_bytes: usize) -> Vec<u8> {
+pub fn get_random_bytes(num_bytes: usize) -> Vec<u8> {
     let mut bytes = vec![0u8; num_bytes];
     rand::fill(&mut bytes[..]);
     bytes.to_vec()
@@ -120,28 +119,6 @@ pub fn encrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     Ok(encrypted_msg)
 }
 
-pub fn random_encrypt(ciphertext: &[u8]) -> (Vec<u8>, bool) {
-    let mut rng = rand::rng();
-    let num_bytes_before: usize = rng.random_range(5..=10);
-    let bytes_before = get_random_bytes(num_bytes_before);
-    let num_bytes_after: usize = rng.random_range(5..=10);
-    let bytes_after = get_random_bytes(num_bytes_after);
-    let mut cipher_vec = Vec::with_capacity(ciphertext.len() + num_bytes_before + num_bytes_after);
-    cipher_vec.extend(bytes_before);
-    cipher_vec.extend_from_slice(ciphertext);
-    cipher_vec.extend(bytes_after);
-
-    let key = get_random_bytes(AES128_BLOCK_SIZE);
-    if rng.random() {
-        // CBC.
-        let iv = get_random_bytes(AES128_BLOCK_SIZE);
-        (encrypt_aes_cbc(&cipher_vec, &key, &iv).unwrap(), false)
-    } else {
-        // ECB.
-        (encrypt_aes_ecb(&cipher_vec, &key, None).unwrap(), true)
-    }
-}
-
 // ***** TESTS *****
 
 #[test]
@@ -166,8 +143,7 @@ fn test_aes128_cbc() {
 fn test_aes128_ecb() {
     let message = "This is a test message with some text to encrypt yada yada yada.".as_bytes();
     let key = "Rick Sanchez....".as_bytes();
-    let iv = [0u8; 16];
-    let encrypted = encrypt_aes_ecb(message, key, Some(&iv)).unwrap();
-    let decrypted = decrypt_aes_ecb(&encrypted, key, Some(&iv)).unwrap();
+    let encrypted = encrypt_aes_ecb(message, key).unwrap();
+    let decrypted = decrypt_aes_ecb(&encrypted, key).unwrap();
     assert_eq!(message, decrypted);
 }

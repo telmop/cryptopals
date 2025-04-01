@@ -228,7 +228,7 @@ fn challenge6() {
 fn challenge7() {
     let key = "YELLOW SUBMARINE".as_bytes();
     let ciphertext = cryptopals::encoding::from_base64_file(&PathBuf::from("data/7.txt")).unwrap();
-    let decrypted_bytes = cryptopals::encryption::decrypt_aes_ecb(&ciphertext, key, None).unwrap();
+    let decrypted_bytes = cryptopals::encryption::decrypt_aes_ecb(&ciphertext, key).unwrap();
     let decrypted = String::from_utf8(decrypted_bytes).unwrap();
     println!("Decrypted text: {}", decrypted);
 }
