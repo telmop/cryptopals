@@ -6,23 +6,9 @@ use rand::Rng;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-fn pkcs7_padding(bytes: &[u8], block_size: u8) -> Vec<u8> {
-    assert!((block_size as usize) >= bytes.len());
-    if bytes.len() == (block_size as usize) {
-        return bytes.iter().copied().collect();
-    }
-    let padding = block_size - (bytes.len() as u8);
-    let mut result = Vec::with_capacity(block_size as usize);
-    result.extend_from_slice(bytes);
-    for _ in 0..padding {
-        result.push(padding);
-    }
-    result
-}
-
 fn challenge9() {
     let bytes = "YELLOW SUBMARINE".as_bytes();
-    let padded = pkcs7_padding(bytes, 20);
+    let padded = encryption::pkcs7_padding(bytes, 20);
     let s = String::from_utf8(padded).unwrap();
     println!("{:?}", s);
 }
@@ -107,7 +93,7 @@ fn find_next_byte(
     known: &[u8],
     key: &[u8],
     min_padding: usize,
-    prefix: Option<&[u8]>,  // Needed for challenge 14. Not used by this function (obviously), just passed.
+    prefix: Option<&[u8]>, // Needed for challenge 14. Not used by this function (obviously), just passed.
 ) -> Option<u8> {
     let block_size = key.len();
     let mut last_bytes = vec![b'B'; min_padding]; // In case there's any prefix (Challenge 14).
@@ -286,6 +272,16 @@ fn challenge14() {
     println!("Decoded message: {}", decoded);
 }
 
+fn challenge15() {
+    let example1 = encryption::undo_pkcs7_padding("ICE ICE BABY\x04\x04\x04\x04".as_bytes());
+    let example2 = encryption::undo_pkcs7_padding("ICE ICE BABY\x05\x05\x05\x05".as_bytes());
+    let example3 = encryption::undo_pkcs7_padding("ICE ICE BABY\x01\x02\x03\x04".as_bytes());
+    assert_eq!(example1, Some("ICE ICE BABY".as_bytes().to_vec()));
+    assert_eq!(example2, None);
+    assert_eq!(example3, None);
+    println!("Completed!");
+}
+
 fn main() {
     let challenges = [
         challenge9,
@@ -294,6 +290,7 @@ fn main() {
         challenge12,
         challenge13,
         challenge14,
+        challenge15,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 9);

@@ -119,6 +119,40 @@ pub fn encrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     Ok(encrypted_msg)
 }
 
+pub fn pkcs7_padding(bytes: &[u8], block_size: usize) -> Vec<u8> {
+    assert!(block_size >= bytes.len());
+    assert!(block_size <= std::u8::MAX as usize); // Needs to fit u8.
+    if bytes.len() == block_size {
+        return bytes.to_vec();
+    }
+    let padding = block_size - bytes.len();
+    let mut result = Vec::with_capacity(block_size);
+    result.extend_from_slice(bytes);
+    result.extend(vec![padding as u8; padding]);
+    result
+}
+
+pub fn undo_pkcs7_padding(bytes: &[u8]) -> Option<Vec<u8>> {
+    if bytes.len() == 0 {
+        return None;
+    }
+    let mut bytes_vec = bytes.to_vec();
+    let to_drop = *bytes.last().unwrap();
+    if to_drop == 0 {
+        // 0 is invalid PKCS#7.
+        return None;
+    }
+    let mut dropped = 0;
+    while dropped < to_drop {
+        if bytes_vec.last() != Some(&to_drop) {
+            return None;
+        }
+        bytes_vec.pop();
+        dropped += 1
+    }
+    Some(bytes_vec)
+}
+
 // ***** TESTS *****
 
 #[test]
