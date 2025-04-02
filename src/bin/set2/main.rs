@@ -86,22 +86,36 @@ fn challenge11() {
     );
 }
 
-fn encrypt_with_hidden(msg: &[u8], key: &[u8]) -> Vec<u8> {
+fn encrypt_with_hidden(msg: &[u8], key: &[u8], random_prefix: Option<&[u8]>) -> Vec<u8> {
     let hidden_b64 = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
     let hidden = encoding::b64decode(hidden_b64).expect("Should be valid b64");
-    let mut final_msg = msg.to_vec();
+    let mut final_msg;
+    match random_prefix {
+        Some(rp) => {
+            final_msg = rp.to_vec();
+            final_msg.extend_from_slice(msg);
+        }
+        None => {
+            final_msg = msg.to_vec();
+        }
+    }
     final_msg.extend(hidden);
     encryption::encrypt_aes_ecb(&final_msg, key).unwrap()
 }
 
-fn find_next_byte(known: &[u8], key: &[u8]) -> Option<u8> {
+fn find_next_byte(
+    known: &[u8],
+    key: &[u8],
+    min_padding: usize,
+    prefix: Option<&[u8]>,  // Needed for challenge 14. Not used by this function (obviously), just passed.
+) -> Option<u8> {
     let block_size = key.len();
-    let mut last_bytes;
+    let mut last_bytes = vec![b'B'; min_padding]; // In case there's any prefix (Challenge 14).
     if known.len() < block_size {
-        last_bytes = vec![b'A'; block_size - 1 - known.len()];
+        last_bytes.extend(vec![b'A'; block_size - 1 - known.len()]);
         last_bytes.extend_from_slice(known);
     } else {
-        last_bytes = known[known.len() - (block_size - 1)..].to_vec();
+        last_bytes.extend_from_slice(&known[known.len() - (block_size - 1)..]);
     }
 
     // Important: the padding is always b'A' as otherwise at some point last_bytes
@@ -119,7 +133,7 @@ fn find_next_byte(known: &[u8], key: &[u8]) -> Option<u8> {
         guess.push(guess_byte); // At this point, len() = block_size.
 
         guess.extend(padding.clone());
-        let encrypted = encrypt_with_hidden(&guess, &key);
+        let encrypted = encrypt_with_hidden(&guess, &key, prefix);
         if detect_ecb(&encrypted, block_size) {
             // Found correct byte.
             return Some(guess_byte);
@@ -134,10 +148,10 @@ fn challenge12() {
     // First find the block size.
     // It is the smallest increment between ciphertext lengths.
     let mut block_size = 0;
-    let orig_len = encrypt_with_hidden(&[], &key).len();
+    let orig_len = encrypt_with_hidden(&[], &key, None).len();
     for guess in 1..64 {
         let msg = vec![b'A'; guess];
-        let encrypted = encrypt_with_hidden(&msg, &key);
+        let encrypted = encrypt_with_hidden(&msg, &key, None);
         if encrypted.len() > orig_len {
             block_size = encrypted.len() - orig_len;
             break;
@@ -148,19 +162,22 @@ fn challenge12() {
     // Find out it's encrypted with ECB.
     {
         let msg = vec![b'A'; block_size * 2];
-        let encrypted = encrypt_with_hidden(&msg, &key);
+        let encrypted = encrypt_with_hidden(&msg, &key, None);
         assert!(detect_ecb(&encrypted, block_size));
         println!("It's ECB!");
     }
 
     // Verify that the hidden message itself doesn't have repeated bytes.
-    assert!(!detect_ecb(&encrypt_with_hidden(&[], &key), block_size));
+    assert!(!detect_ecb(
+        &encrypt_with_hidden(&[], &key, None),
+        block_size
+    ));
 
     // The message is 138 bytes :)
     let msg_len: usize = 138;
     let mut known_bytes = Vec::<u8>::with_capacity(msg_len);
     while known_bytes.len() != msg_len {
-        let new_byte = find_next_byte(&known_bytes, &key).unwrap();
+        let new_byte = find_next_byte(&known_bytes, &key, 0, None).unwrap();
         known_bytes.push(new_byte);
     }
     let decoded = String::from_utf8(known_bytes).unwrap();
@@ -231,6 +248,44 @@ fn challenge13() {
     assert_eq!(attacked_profile.get("role"), Some(&"admin".to_string()));
 }
 
+fn challenge14() {
+    let mut rng = rand::rng();
+    let prefix_size = rng.random_range(5..=20);
+    let prefix = encryption::get_random_bytes(prefix_size);
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+
+    // Find prefix size.
+    // If we add 2 * block_size + (block_size - prefix.len()) b'A' we'll get 2 blocks of b'A'
+    // and get an ECB detection. We can then find the prefix length (modulo block size).
+    // prefix.len() % block_size = 3 * block_size - guess.
+    // We can't distinguish a prefix length of 2 from one of block_size + 2, but it doesn't
+    // matter for our purposes. All we care about is byte alignment.
+    let mut estimated_length = None;
+    for guess in 0..=(3 * AES128_BLOCK_SIZE) {
+        let msg = vec![b'A'; guess];
+        let encrypted = encrypt_with_hidden(&msg, &key, Some(&prefix));
+        if detect_ecb(&encrypted, AES128_BLOCK_SIZE) {
+            estimated_length = Some((3 * AES128_BLOCK_SIZE - guess) % AES128_BLOCK_SIZE);
+            break;
+        }
+    }
+    assert_eq!(estimated_length, Some(prefix.len() % AES128_BLOCK_SIZE));
+    println!("Prefix length: {:?}", estimated_length);
+
+    // Pretty much the same as for challenge 12, except that now we add extra padding so that
+    // the random prefix plus our padding fills one block. After that, the challenge is exactly
+    // the same as challenge 12.
+    let min_padding = AES128_BLOCK_SIZE - estimated_length.unwrap();
+    let msg_len: usize = 138;
+    let mut known_bytes = Vec::<u8>::with_capacity(msg_len);
+    while known_bytes.len() != msg_len {
+        let new_byte = find_next_byte(&known_bytes, &key, min_padding, Some(&prefix)).unwrap();
+        known_bytes.push(new_byte);
+    }
+    let decoded = String::from_utf8(known_bytes).unwrap();
+    println!("Decoded message: {}", decoded);
+}
+
 fn main() {
     let challenges = [
         challenge9,
@@ -238,6 +293,7 @@ fn main() {
         challenge11,
         challenge12,
         challenge13,
+        challenge14,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 9);
