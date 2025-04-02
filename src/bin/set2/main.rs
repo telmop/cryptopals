@@ -3,6 +3,7 @@ use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
 use cryptopals::utils;
 use rand::Rng;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn pkcs7_padding(bytes: &[u8], block_size: u8) -> Vec<u8> {
@@ -166,8 +167,78 @@ fn challenge12() {
     println!("Decoded message: {}", decoded);
 }
 
+fn parse_params(param_str: &str) -> Option<HashMap<String, String>> {
+    let mut parsed = HashMap::new();
+    for pair in param_str.split("&") {
+        match pair.split_once("=") {
+            Some((key, value)) => {
+                parsed.insert(key.to_string(), value.to_string());
+            }
+            _ => return None,
+        }
+    }
+    Some(parsed)
+}
+
+fn encode_profile(params: &HashMap<String, String>) -> String {
+    let email = params.get("email").unwrap();
+    let uid = params.get("uid").unwrap();
+    let role = params.get("role").unwrap();
+    format!("email={}&uid={}&role={}", email, uid, role)
+}
+
+fn profile_for(email: &str) -> Option<String> {
+    if email.contains("&") || email.contains("=") {
+        return None;
+    }
+    let profile = HashMap::from([
+        ("email".to_string(), email.to_string()),
+        ("uid".to_string(), "1".to_string()),
+        ("role".to_string(), "user".to_string()),
+    ]);
+    Some(encode_profile(&profile))
+}
+
+fn challenge13() {
+    let test_profile = profile_for("me@example.com").unwrap();
+    assert_eq!(test_profile, "email=me@example.com&uid=1&role=user");
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+
+    /* This will produce a profile like:
+    email=AAAAAAAAAA admin\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b &uid=1&role=user
+    With these 3 blocks. The 2nd block is a block we can save for later.
+    \x0b is PKCS#7 padding.
+    */
+    let email1 = "AAAAAAAAAAadmin\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b";
+    let profile1 = profile_for(email1).unwrap();
+    let encrypted1 = encryption::encrypt_aes_ecb(&profile1.as_bytes(), &key).unwrap();
+    let admin_block = encrypted1[AES128_BLOCK_SIZE..2 * AES128_BLOCK_SIZE].to_vec(); // Get 2nd block.
+
+    /* This will produce a profile like:
+    email=test@tests .com&uid=1&role= user
+    Where the role is in its own block - which we can replace!
+    */
+    let email2 = "test@tests.com";
+    let profile2 = profile_for(email2).unwrap();
+    let encrypted2 = encryption::encrypt_aes_ecb(&profile2.as_bytes(), &key).unwrap();
+
+    let mut attacked = encrypted2[..encrypted2.len() - AES128_BLOCK_SIZE].to_vec();
+    attacked.extend(admin_block);
+    let decrypted = encryption::decrypt_aes_ecb(&attacked, &key).unwrap();
+    let decrypted_str = String::from_utf8(decrypted).unwrap();
+    println!("{}", decrypted_str);
+    let attacked_profile = parse_params(&decrypted_str).unwrap();
+    assert_eq!(attacked_profile.get("role"), Some(&"admin".to_string()));
+}
+
 fn main() {
-    let challenges = [challenge9, challenge10, challenge11, challenge12];
+    let challenges = [
+        challenge9,
+        challenge10,
+        challenge11,
+        challenge12,
+        challenge13,
+    ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 9);
         challenge();
