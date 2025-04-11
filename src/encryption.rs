@@ -1,17 +1,25 @@
 use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
+use std::cmp::max;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 pub const AES128_BLOCK_SIZE: usize = 16;
 
-pub fn xor(bytes1: &[u8], bytes2: &[u8]) -> Result<Vec<u8>> {
-    if bytes1.len() != bytes2.len() {
-        return Err("Lengths must match!".into());
+pub fn xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
+    let max_len = max(bytes1.len(), bytes2.len());
+    let mut output = Vec::with_capacity(max_len);
+    let mut idx = 0;
+    while idx < max_len {
+        let mut res = 0;
+        if idx < bytes1.len() {
+            res ^= bytes1[idx];
+        }
+        if idx < bytes2.len() {
+            res ^= bytes2[idx];
+        }
+        output.push(res);
+        idx += 1;
     }
-    let mut output = Vec::with_capacity(bytes1.len());
-    for i in 0..bytes1.len() {
-        output.push(bytes1[i] ^ bytes2[i]);
-    }
-    Ok(output)
+    output
 }
 
 pub fn sliding_xor(message: &[u8], mask: &[u8]) -> Vec<u8> {
@@ -66,14 +74,11 @@ pub fn decrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     for i in (0..ciphertext.len()).step_by(AES128_BLOCK_SIZE) {
         let block = &ciphertext[i..i + AES128_BLOCK_SIZE];
         let decrypted = decrypt_aes_block(block, key)?;
-        let mut decoded_block = xor(&decrypted, &cur_iv)?;
+        let mut decoded_block = xor(&decrypted, &cur_iv);
         if i == ciphertext.len() - AES128_BLOCK_SIZE {
             // Last block. We need to remove the padding.
-            if let Some(last) = decoded_block.last() {
-                decoded_block.truncate(decoded_block.len() - *last as usize);
-            } else {
-                panic!("This shouldn't happen!");
-            }
+            decoded_block =
+                undo_pkcs7_padding(&decoded_block).ok_or_else(|| "Invalid padding".to_string())?;
         }
         decoded_msg.append(&mut decoded_block);
         cur_iv = block.to_vec();
@@ -111,7 +116,7 @@ pub fn encrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     let mut encrypted_msg = Vec::<u8>::with_capacity(cipher_vec.len());
     for i in (0..cipher_vec.len()).step_by(AES128_BLOCK_SIZE) {
         let block = &cipher_vec[i..i + AES128_BLOCK_SIZE];
-        let xored_block = xor(&block, &cur_iv)?;
+        let xored_block = xor(&block, &cur_iv);
         let encrypted = encrypt_aes_block(&xored_block, key)?;
         encrypted_msg.append(&mut encrypted.clone());
         cur_iv = encrypted;
@@ -132,25 +137,26 @@ pub fn pkcs7_padding(bytes: &[u8], block_size: usize) -> Vec<u8> {
     result
 }
 
-pub fn undo_pkcs7_padding(bytes: &[u8]) -> Option<Vec<u8>> {
-    if bytes.len() == 0 {
+pub fn undo_pkcs7_padding(block: &[u8]) -> Option<Vec<u8>> {
+    if block.len() == 0 {
         return None;
     }
-    let mut bytes_vec = bytes.to_vec();
-    let to_drop = *bytes.last().unwrap();
-    if to_drop == 0 {
+    let block_size = block.len();
+    let mut block_vec = block.to_vec();
+    let to_drop = *block.last().unwrap();
+    if to_drop == 0 || (to_drop as usize) > block_size {
         // 0 is invalid PKCS#7.
         return None;
     }
     let mut dropped = 0;
     while dropped < to_drop {
-        if bytes_vec.last() != Some(&to_drop) {
+        if block_vec.last() != Some(&to_drop) {
             return None;
         }
-        bytes_vec.pop();
+        block_vec.pop();
         dropped += 1
     }
-    Some(bytes_vec)
+    Some(block_vec)
 }
 
 // ***** TESTS *****

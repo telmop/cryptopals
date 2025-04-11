@@ -19,7 +19,7 @@ fn challenge2() {
         cryptopals::encoding::hexstr_to_bytes("1c0111001f010100061a024b53535009181c").unwrap();
     let bytes2 =
         cryptopals::encoding::hexstr_to_bytes("686974207468652062756c6c277320657965").unwrap();
-    let result = cryptopals::encryption::xor(&bytes1, &bytes2).unwrap();
+    let result = cryptopals::encryption::xor(&bytes1, &bytes2);
     let result_str = cryptopals::encoding::bytes_to_hexstr(&result);
     assert_eq!(result_str, "746865206b696420646f6e277420706c6179");
 }
