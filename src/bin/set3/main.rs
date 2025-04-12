@@ -2,6 +2,7 @@ use cryptopals::attack;
 use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
+use cryptopals::random;
 use rand::prelude::IteratorRandom;
 use std::cmp;
 use std::fs::File;
@@ -223,8 +224,19 @@ fn challenge20() {
     }
 }
 
+fn challenge21() {
+    let mut rng = random::MT19937::new(0);
+    assert_eq!(rng.random(), 2357136044);
+}
+
 fn main() {
-    let challenges = [challenge17, challenge18, challenge19, challenge20];
+    let challenges = [
+        challenge17,
+        challenge18,
+        challenge19,
+        challenge20,
+        challenge21,
+    ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 17);
         challenge();
