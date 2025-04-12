@@ -1,11 +1,12 @@
 use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
-use std::cmp::max;
+use std::cmp;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 pub const AES128_BLOCK_SIZE: usize = 16;
 
+// Xors two sequences of different lengths. The shortest sequences is padded with zeros to match the largest.
 pub fn xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
-    let max_len = max(bytes1.len(), bytes2.len());
+    let max_len = cmp::max(bytes1.len(), bytes2.len());
     let mut output = Vec::with_capacity(max_len);
     let mut idx = 0;
     while idx < max_len {
@@ -20,6 +21,14 @@ pub fn xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
         idx += 1;
     }
     output
+}
+
+// Xors two sequences of different lengths, and truncates the result to the shortest length.
+pub fn truncated_xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
+    let mut xored = xor(bytes1, bytes2);
+    let min_length = cmp::min(bytes1.len(), bytes2.len());
+    xored.truncate(min_length);
+    xored
 }
 
 pub fn sliding_xor(message: &[u8], mask: &[u8]) -> Vec<u8> {

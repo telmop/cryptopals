@@ -25,7 +25,8 @@ fn challenge2() {
 fn challenge3() {
     let hexstr = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
     let bytes = cryptopals::encoding::hexstr_to_bytes(hexstr).unwrap();
-    let (best_key, best_score) = cryptopals::attack::find_best_key(&bytes);
+    let (best_key, best_score) =
+        cryptopals::attack::find_best_key(&bytes, cryptopals::attack::Score::Simple);
     let decrypted =
         String::from_utf8(cryptopals::encryption::sliding_xor(&bytes, &vec![best_key])).unwrap();
     println!(
@@ -43,7 +44,8 @@ fn challenge4() {
     for line_result in reader.lines() {
         let line = line_result.expect("Error reading line.");
         let bytes = cryptopals::encoding::hexstr_to_bytes(&line).unwrap();
-        let (best_key, best_score) = cryptopals::attack::find_best_key(&bytes);
+        let (best_key, best_score) =
+            cryptopals::attack::find_best_key(&bytes, cryptopals::attack::Score::Simple);
         if best_score > highest_score {
             highest_score = best_score;
             key = best_key;
@@ -79,7 +81,8 @@ fn find_best_multibyte_key(encrypted: &[u8], key_size: usize) -> (Vec<u8>, Vec<u
             .step_by(key_size)
             .cloned()
             .collect();
-        let (key, score) = cryptopals::attack::find_best_key(&relevant_bytes);
+        let (key, score) =
+            cryptopals::attack::find_best_key(&relevant_bytes, cryptopals::attack::Score::Simple);
         decryption_key.push(key);
         scores.push(score);
     }

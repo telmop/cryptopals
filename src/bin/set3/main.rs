@@ -1,7 +1,13 @@
+use cryptopals::attack;
 use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
 use rand::prelude::IteratorRandom;
+use std::cmp;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 fn encrypt_random_message(key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
@@ -114,8 +120,111 @@ fn challenge18() {
     assert_eq!(encryption::aes128_ctr(&decrypted, key, &nonce), encrypted);
 }
 
+fn attack_fixed_nonce_ctr(encrypted_msgs: &[Vec<u8>]) -> Vec<u8> {
+    let max_length = encrypted_msgs
+        .iter()
+        .map(|msg| msg.len())
+        .fold(0, |acc, x| cmp::max(acc, x));
+    let mut key = Vec::with_capacity(max_length);
+    for i in 0..max_length {
+        let mut relevant_bytes = Vec::with_capacity(encrypted_msgs.len());
+        for encrypted in encrypted_msgs {
+            if encrypted.len() <= i {
+                continue;
+            }
+            relevant_bytes.push(encrypted[i]);
+        }
+        let (best_key, _) = attack::find_best_key(&relevant_bytes, attack::Score::Quadratic);
+        key.push(best_key);
+    }
+    key
+}
+
+// For both challenges 19 and 20, the last few bytes are off. This is because there are not
+// enough unigrams to be accurate. We could use common bigrams, but I'm lazy :)
+fn challenge19() {
+    let msgs: Vec<Vec<u8>> = vec![
+        "SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
+        "Q29taW5nIHdpdGggdml2aWQgZmFjZXM=",
+        "RnJvbSBjb3VudGVyIG9yIGRlc2sgYW1vbmcgZ3JleQ==",
+        "RWlnaHRlZW50aC1jZW50dXJ5IGhvdXNlcy4=",
+        "SSBoYXZlIHBhc3NlZCB3aXRoIGEgbm9kIG9mIHRoZSBoZWFk",
+        "T3IgcG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
+        "T3IgaGF2ZSBsaW5nZXJlZCBhd2hpbGUgYW5kIHNhaWQ=",
+        "UG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
+        "QW5kIHRob3VnaHQgYmVmb3JlIEkgaGFkIGRvbmU=",
+        "T2YgYSBtb2NraW5nIHRhbGUgb3IgYSBnaWJl",
+        "VG8gcGxlYXNlIGEgY29tcGFuaW9u",
+        "QXJvdW5kIHRoZSBmaXJlIGF0IHRoZSBjbHViLA==",
+        "QmVpbmcgY2VydGFpbiB0aGF0IHRoZXkgYW5kIEk=",
+        "QnV0IGxpdmVkIHdoZXJlIG1vdGxleSBpcyB3b3JuOg==",
+        "QWxsIGNoYW5nZWQsIGNoYW5nZWQgdXR0ZXJseTo=",
+        "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
+        "VGhhdCB3b21hbidzIGRheXMgd2VyZSBzcGVudA==",
+        "SW4gaWdub3JhbnQgZ29vZCB3aWxsLA==",
+        "SGVyIG5pZ2h0cyBpbiBhcmd1bWVudA==",
+        "VW50aWwgaGVyIHZvaWNlIGdyZXcgc2hyaWxsLg==",
+        "V2hhdCB2b2ljZSBtb3JlIHN3ZWV0IHRoYW4gaGVycw==",
+        "V2hlbiB5b3VuZyBhbmQgYmVhdXRpZnVsLA==",
+        "U2hlIHJvZGUgdG8gaGFycmllcnM/",
+        "VGhpcyBtYW4gaGFkIGtlcHQgYSBzY2hvb2w=",
+        "QW5kIHJvZGUgb3VyIHdpbmdlZCBob3JzZS4=",
+        "VGhpcyBvdGhlciBoaXMgaGVscGVyIGFuZCBmcmllbmQ=",
+        "V2FzIGNvbWluZyBpbnRvIGhpcyBmb3JjZTs=",
+        "SGUgbWlnaHQgaGF2ZSB3b24gZmFtZSBpbiB0aGUgZW5kLA==",
+        "U28gc2Vuc2l0aXZlIGhpcyBuYXR1cmUgc2VlbWVkLA==",
+        "U28gZGFyaW5nIGFuZCBzd2VldCBoaXMgdGhvdWdodC4=",
+        "VGhpcyBvdGhlciBtYW4gSSBoYWQgZHJlYW1lZA==",
+        "QSBkcnVua2VuLCB2YWluLWdsb3Jpb3VzIGxvdXQu",
+        "SGUgaGFkIGRvbmUgbW9zdCBiaXR0ZXIgd3Jvbmc=",
+        "VG8gc29tZSB3aG8gYXJlIG5lYXIgbXkgaGVhcnQs",
+        "WWV0IEkgbnVtYmVyIGhpbSBpbiB0aGUgc29uZzs=",
+        "SGUsIHRvbywgaGFzIHJlc2lnbmVkIGhpcyBwYXJ0",
+        "SW4gdGhlIGNhc3VhbCBjb21lZHk7",
+        "SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=",
+        "VHJhbnNmb3JtZWQgdXR0ZXJseTo=",
+        "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
+    ]
+    .into_iter()
+    .map(|s| encoding::b64decode(s).unwrap())
+    .collect();
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+    let nonce = vec![0u8; AES128_BLOCK_SIZE / 2];
+
+    let encrypted_msgs: Vec<Vec<u8>> = msgs
+        .iter()
+        .map(|msg| encryption::aes128_ctr(&msg, &key, &nonce))
+        .collect();
+    let guess = attack_fixed_nonce_ctr(&encrypted_msgs);
+    for encrypted in &encrypted_msgs {
+        let decrypted = encryption::truncated_xor(encrypted, &guess);
+        println!("{}", String::from_utf8(decrypted).unwrap());
+    }
+}
+
+fn challenge20() {
+    let f = File::open(PathBuf::from("data/20.txt")).expect("Couldn't open file");
+    let reader = BufReader::new(f);
+    let msgs: Vec<Vec<u8>> = reader
+        .lines()
+        .map(|s| encoding::b64decode(s.unwrap().trim()).unwrap())
+        .collect();
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+    let nonce = vec![0u8; AES128_BLOCK_SIZE / 2];
+
+    let encrypted_msgs: Vec<Vec<u8>> = msgs
+        .iter()
+        .map(|msg| encryption::aes128_ctr(&msg, &key, &nonce))
+        .collect();
+    let guess = attack_fixed_nonce_ctr(&encrypted_msgs);
+    for encrypted in &encrypted_msgs {
+        let decrypted = encryption::truncated_xor(encrypted, &guess);
+        println!("{}", String::from_utf8(decrypted).unwrap());
+    }
+}
+
 fn main() {
-    let challenges = [challenge17, challenge18];
+    let challenges = [challenge17, challenge18, challenge19, challenge20];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 17);
         challenge();
