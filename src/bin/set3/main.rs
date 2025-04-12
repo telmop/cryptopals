@@ -3,11 +3,12 @@ use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
 use cryptopals::random;
-use rand::prelude::IteratorRandom;
+use rand::prelude::{IteratorRandom, Rng};
 use std::cmp;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
@@ -229,6 +230,54 @@ fn challenge21() {
     assert_eq!(rng.random(), 2357136044);
 }
 
+fn sleep(time: u32) {
+    let wait_time = std::time::Duration::from_secs(time as u64);
+    std::thread::sleep(wait_time);
+}
+
+fn get_timestamp_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs()
+}
+
+fn gen_random_with_wait(min_wait: u32, max_wait: u32, fake_wait: bool) -> (u32, u32) {
+    let mut rng = rand::rng();
+    let wait1 = rng.random_range(min_wait..=max_wait);
+    let dt;
+    if !fake_wait {
+        sleep(wait1);
+        dt = 0;
+    } else {
+        dt = wait1;
+    }
+    let seed = get_timestamp_seconds() as u32 - dt;
+    let mut mt = random::MT19937::new(seed);
+    if !fake_wait {
+        sleep(rng.random_range(min_wait..=max_wait));
+    }
+    (mt.random(), seed)
+}
+
+fn challenge22() {
+    let min_wait = 40;
+    let max_wait = 1000;
+    let (random_n, seed) = gen_random_with_wait(min_wait, max_wait, true);
+
+    let timestamp = get_timestamp_seconds() as u32;
+    for dt in 0..=3 * max_wait {
+        let mut mt = random::MT19937::new(timestamp - dt);
+        let n = mt.random();
+        if n == random_n {
+            // Found correct seed.
+            assert_eq!(timestamp - dt, seed);
+            println!("Found seed: {}", timestamp - dt);
+            break;
+        }
+    }
+}
+
 fn main() {
     let challenges = [
         challenge17,
@@ -236,6 +285,7 @@ fn main() {
         challenge19,
         challenge20,
         challenge21,
+        challenge22,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 17);
