@@ -124,6 +124,23 @@ pub fn encrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     Ok(encrypted_msg)
 }
 
+pub fn aes128_ctr(ciphertext: &[u8], key: &[u8], nonce: &[u8]) -> Vec<u8> {
+    assert_eq!(key.len(), AES128_BLOCK_SIZE);
+    assert_eq!(nonce.len(), AES128_BLOCK_SIZE / 2);
+    let num_blocks = ciphertext.len().div_ceil(AES128_BLOCK_SIZE);
+    assert!(num_blocks < 256);
+    let mut mask = Vec::with_capacity(num_blocks * AES128_BLOCK_SIZE);
+    let mut counter = nonce.to_vec();
+    counter.extend(vec![0u8; AES128_BLOCK_SIZE / 2]);
+    for i in 0u8..(num_blocks as u8) {
+        counter[8] = i;
+        mask.extend(encrypt_aes_block(&counter, key).unwrap());
+    }
+    let mut result = xor(ciphertext, &mask);
+    result.truncate(ciphertext.len());
+    result
+}
+
 pub fn pkcs7_padding(bytes: &[u8], block_size: usize) -> Vec<u8> {
     assert!(block_size >= bytes.len());
     assert!(block_size <= std::u8::MAX as usize); // Needs to fit u8.

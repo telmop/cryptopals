@@ -102,8 +102,20 @@ fn challenge17() {
     println!("Decrypted: {}", std::str::from_utf8(&decrypted).unwrap());
 }
 
+fn challenge18() {
+    let encrypted = encoding::b64decode(
+        "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==",
+    )
+    .unwrap();
+    let key = "YELLOW SUBMARINE".as_bytes();
+    let nonce = vec![0u8; AES128_BLOCK_SIZE / 2];
+    let decrypted = encryption::aes128_ctr(&encrypted, key, &nonce);
+    println!("Decrypted: {}", std::str::from_utf8(&decrypted).unwrap());
+    assert_eq!(encryption::aes128_ctr(&decrypted, key, &nonce), encrypted);
+}
+
 fn main() {
-    let challenges = [challenge17];
+    let challenges = [challenge17, challenge18];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 17);
         challenge();
