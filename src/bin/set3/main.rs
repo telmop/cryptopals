@@ -278,6 +278,19 @@ fn challenge22() {
     }
 }
 
+fn challenge23() {
+    let mut rng = random::MT19937::new(19650218);
+    let mut clone = random::MT19937::empty();
+    for _ in 0..random::N {
+        let value = rng.random();
+        clone.reconstruct_state(value);
+    }
+    for _ in 0..100 {
+        assert_eq!(rng.random(), clone.random());
+    }
+    println!("Values match: {} {}", rng.random(), clone.random());
+}
+
 fn main() {
     let challenges = [
         challenge17,
@@ -286,6 +299,7 @@ fn main() {
         challenge20,
         challenge21,
         challenge22,
+        challenge23,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 17);
