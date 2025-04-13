@@ -26,7 +26,9 @@ impl MT19937 {
         let mut cur_seed = seed;
         state[0] = cur_seed;
         for i in 1..N {
-            cur_seed = F.wrapping_mul(cur_seed ^ (cur_seed >> (W - 2))) + i;
+            cur_seed = F
+                .wrapping_mul(cur_seed ^ (cur_seed >> (W - 2)))
+                .wrapping_add(i);
             state[i as usize] = cur_seed;
         }
         MT19937 { state, index: 0 }

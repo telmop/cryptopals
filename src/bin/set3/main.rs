@@ -291,6 +291,76 @@ fn challenge23() {
     println!("Values match: {} {}", rng.random(), clone.random());
 }
 
+fn generate_random_bytes_from_mt19937(seed: u16, length: usize) -> Vec<u8> {
+    let mut key = Vec::with_capacity(length);
+    // +3 (= +4 -1) to get the ceiling.
+    let num_to_gen = (length + 3) / 4;
+    let mut rng = random::MT19937::new(seed as u32);
+    for _ in 0..num_to_gen {
+        let value = rng.random();
+        key.push((value & 0xFF) as u8);
+        key.push(((value >> 8) & 0xFF) as u8);
+        key.push(((value >> 16) & 0xFF) as u8);
+        key.push(((value >> 24) & 0xFF) as u8);
+    }
+    key
+}
+
+fn mt19937_one_time_pad(msg: &[u8], seed: u16) -> Vec<u8> {
+    let key = generate_random_bytes_from_mt19937(seed, msg.len());
+    encryption::truncated_xor(msg, &key)
+}
+
+fn is_mt19937_generated_token(token: &[u8]) -> bool {
+    for guess in 0..u16::MAX {
+        let guess_token = generate_random_bytes_from_mt19937(guess, 16);
+        if &guess_token == token {
+            return true;
+        }
+    }
+    false
+}
+
+fn challenge24() {
+    // Part 1: validate encryption works.
+    {
+        let msg = "This is a relatively short secret message...".as_bytes();
+        let mut rng = rand::rng();
+        let seed: u16 = rng.random();
+        let encrypted = mt19937_one_time_pad(msg, seed);
+        // Decrypt function is the same, since this is a xor.
+        let decrypted = mt19937_one_time_pad(&encrypted, seed);
+        assert_eq!(msg, decrypted);
+    }
+
+    // Part 2: break u16 key.
+    {
+        let mut rng = rand::rng();
+        let seed: u16 = rng.random();
+        let prefix_size: usize = rng.random_range(5..=20);
+        let mut msg = encryption::get_random_bytes(prefix_size);
+        msg.extend(vec![b'A'; 14]);
+        let encrypted = mt19937_one_time_pad(&msg, seed);
+        for guess in 0..u16::MAX {
+            let decrypted = mt19937_one_time_pad(&encrypted, guess);
+            if &decrypted[decrypted.len() - 14..decrypted.len()] == &vec![b'A'; 14] {
+                assert_eq!(seed, guess);
+                println!("Found seed: {}", guess);
+                break;
+            }
+        }
+    }
+
+    // Part 3: password reset token.
+    {
+        let unix_time = (get_timestamp_seconds() & (u16::MAX as u64)) as u16;
+        let token = generate_random_bytes_from_mt19937(unix_time, 16);
+        assert!(is_mt19937_generated_token(&token));
+        let proper_token = encryption::get_random_bytes(16);
+        assert!(!is_mt19937_generated_token(&proper_token));
+    }
+}
+
 fn main() {
     let challenges = [
         challenge17,
@@ -300,6 +370,7 @@ fn main() {
         challenge21,
         challenge22,
         challenge23,
+        challenge24,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 17);
