@@ -53,8 +53,39 @@ fn challenge25() {
     assert_eq!(msg, decrypted);
 }
 
+// This and below (challenge26) were mostly copied from set2, challange 16.
+fn ctr_user_data_encode(user_data: &str, key: &[u8], nonce: &[u8]) -> Vec<u8> {
+    let prefix = "comment1=cooking%20MCs;userdata=".as_bytes();
+    let suffix = ";comment2=%20like%20a%20pound%20of%20bacon".as_bytes();
+    let mut user_data_str = user_data.to_string();
+    // Escape special characters to not make the attacker's life as easy.
+    user_data_str = user_data_str.replace(";", "").replace("=", "");
+    let mut data = prefix.to_vec();
+    data.extend(user_data_str.into_bytes());
+    data.extend_from_slice(suffix);
+    encryption::aes128_ctr(&data, key, nonce)
+}
+
+fn challenge26() {
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+    let nonce = [0u8; AES128_BLOCK_SIZE / 2];
+    // Our goal is to decode ";admin=true;". We can't use ';' and '='.
+    // ';' in ascii is 59. ':' (allowed character) is 58 - 1 bit difference.
+    // Likewise, '=' is 61, and '<' is 60 - 1 bit difference.
+    // If we change the correct 3 bits, we get the right decoded string.
+    let mut encrypted = ctr_user_data_encode(":admin<true", &key, &nonce);
+
+    // We want to change the 32nd and 38th characters (`:` -> `;`, and `<` -> `=`).
+    encrypted[32] ^= 0b1;
+    encrypted[38] ^= 0b1;
+    let decrypted = encryption::aes128_ctr(&encrypted, &key, &nonce);
+    let decrypted_str = String::from_utf8_lossy(&decrypted);
+    `assert!(decrypted_str.contains(";admin=true;"));
+    println!("{}", decrypted_str);
+}
+
 fn main() {
-    let challenges = [challenge25];
+    let challenges = [challenge25, challenge26];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 25);
         challenge();
