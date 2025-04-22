@@ -1,3 +1,4 @@
+use cryptopals::auth;
 use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
@@ -172,8 +173,19 @@ fn challenge27() {
     }
 }
 
+fn sha1_mac(msg: &[u8], key: &[u8]) -> [u8; 20] {
+    let mut input = key.to_vec();
+    input.extend_from_slice(msg);
+    auth::sha1(&input)
+}
+
+fn challenge28() {
+    let sha1 = sha1_mac("secure message".as_bytes(), "secret key".as_bytes());
+    println!("{:?}", sha1);
+}
+
 fn main() {
-    let challenges = [challenge25, challenge26, challenge27];
+    let challenges = [challenge25, challenge26, challenge27, challenge28];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 25);
         challenge();
