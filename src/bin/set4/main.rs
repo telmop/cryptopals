@@ -80,12 +80,100 @@ fn challenge26() {
     encrypted[38] ^= 0b1;
     let decrypted = encryption::aes128_ctr(&encrypted, &key, &nonce);
     let decrypted_str = String::from_utf8_lossy(&decrypted);
-    `assert!(decrypted_str.contains(";admin=true;"));
+    assert!(decrypted_str.contains(";admin=true;"));
     println!("{}", decrypted_str);
 }
 
+fn encrypt_cbc128_with_keyiv(msg: &str, key: &[u8]) -> Result<Vec<u8>> {
+    encryption::encrypt_aes_cbc(msg.as_bytes(), key, key)
+}
+
+fn decrypt_cbc128_with_keyiv(ciphertext: &[u8], key: &[u8]) -> Result<String> {
+    let decrypted = encryption::decrypt_aes_cbc(ciphertext, key, key)?;
+    Ok(String::from_utf8(decrypted)?)
+}
+
+fn build_cbc_keyiv_attack_cipher(block: &[u8]) -> Vec<u8> {
+    let mut cipher = block.to_vec();
+    cipher.extend(vec![0u8; AES128_BLOCK_SIZE]);
+    cipher.extend_from_slice(block);
+    cipher
+}
+
+fn challenge27() {
+    let msg = "A secret message that no one will know!";
+    assert!(msg.len() > AES128_BLOCK_SIZE * 2); // Needs to be at least 3 blocks!
+    let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
+    let encrypted = encrypt_cbc128_with_keyiv(msg, &key).unwrap();
+    let mut first_block = encrypted[..AES128_BLOCK_SIZE].to_vec();
+    /* Construct cipher with 3 blocks: C; 0; C.
+    The decryption circuit outputs:
+        * m[0] = D(k, C) xor k
+        * m[1] = D(k, 0) xor C
+        * m[2] = D(k, C) xor 0 = D(k, C)
+    This means that m[0] xor m[2] = k! */
+    {
+        let attack_cipher = build_cbc_keyiv_attack_cipher(&first_block);
+        let result = decrypt_cbc128_with_keyiv(&attack_cipher, &key);
+        assert!(result.is_err());
+    }
+
+    // Unfortunately it's unlikely that the padding is right!
+    // However, we can keep changing the cipher until we get a valid 0x1 padding by chance!
+    let mut bytes = vec![];
+    for byte_idx in 0..AES128_BLOCK_SIZE {
+        let original_value = first_block[byte_idx];
+        let mut done = false;
+        for value in 0u8..=255 {
+            first_block[byte_idx] = value;
+            let attack = build_cbc_keyiv_attack_cipher(&first_block);
+            let result = decrypt_cbc128_with_keyiv(&attack, &key);
+            assert!(result.is_err());
+            if let Err(e) = result {
+                if let Some(utf8_error) = e.downcast_ref::<std::string::FromUtf8Error>() {
+                    bytes = utf8_error.as_bytes().to_vec();
+                    done = true;
+                    break;
+                }
+            }
+        }
+        if done {
+            break;
+        }
+        first_block[byte_idx] = original_value;
+    }
+    // CBC decoding remove the padding byte. We need to add it!
+    bytes.push(0x1);
+    let res_first_block = &bytes[..AES128_BLOCK_SIZE];
+    let res_third_block = &bytes[2 * AES128_BLOCK_SIZE..];
+    let recovered_key = encryption::xor(res_first_block, res_third_block);
+    assert_eq!(key, recovered_key);
+    println!("Recovered key: {:?}", recovered_key);
+
+    // The solution above is too "brute-forcy". A better alternative is to
+    // craft the ciphertext as C1 0 C1 C2 C3. This way, padding is correct
+    // (as long as C1 C2 C3 is a valid cipher).
+    {
+        let mut new_attack_cipher = encrypted[..AES128_BLOCK_SIZE].to_vec();
+        new_attack_cipher.extend(vec![0u8; AES128_BLOCK_SIZE]);
+        new_attack_cipher.extend_from_slice(&encrypted);
+        let result = decrypt_cbc128_with_keyiv(&new_attack_cipher, &key);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            if let Some(utf8_error) = e.downcast_ref::<std::string::FromUtf8Error>() {
+                let err_bytes = utf8_error.as_bytes();
+                let new_recovered = encryption::xor(
+                    &err_bytes[..AES128_BLOCK_SIZE],
+                    &err_bytes[2 * AES128_BLOCK_SIZE..3 * AES128_BLOCK_SIZE],
+                );
+                assert_eq!(key, new_recovered);
+            }
+        }
+    }
+}
+
 fn main() {
-    let challenges = [challenge25, challenge26];
+    let challenges = [challenge25, challenge26, challenge27];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 25);
         challenge();
