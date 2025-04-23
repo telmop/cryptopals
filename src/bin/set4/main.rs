@@ -1,7 +1,7 @@
-use cryptopals::auth;
 use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
+use cryptopals::hash;
 use std::path::{Path, PathBuf};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
@@ -176,7 +176,7 @@ fn challenge27() {
 fn sha1_mac(msg: &[u8], key: &[u8]) -> [u8; 20] {
     let mut input = key.to_vec();
     input.extend_from_slice(msg);
-    let sha1 = auth::Sha1::new();
+    let sha1 = hash::Sha1::new();
     sha1.compute(&input)
 }
 
@@ -196,11 +196,11 @@ fn challenge29() {
     let padded_msg = {
         let mut tmp = key.to_vec();
         tmp.extend_from_slice(orig_msg);
-        let mut padded = auth::pad_msg(tmp.to_vec(), None);
+        let mut padded = hash::pad_msg(tmp.to_vec(), None);
         padded.extend_from_slice(new_message);
         padded
     };
-    let sha1 = auth::Sha1::new();
+    let sha1 = hash::Sha1::new();
     let goal_hash = sha1.compute(&padded_msg);
 
     // Now compute the actual hash with just the original message.
@@ -212,13 +212,13 @@ fn challenge29() {
     let h2 = u32::from_be_bytes(hash[8..12].try_into().unwrap());
     let h3 = u32::from_be_bytes(hash[12..16].try_into().unwrap());
     let h4 = u32::from_be_bytes(hash[16..20].try_into().unwrap());
-    let sha1_forger = auth::Sha1::init(h0, h1, h2, h3, h4);
+    let sha1_forger = hash::Sha1::init(h0, h1, h2, h3, h4);
 
     // For the length, we need to account all of the message: key, original message, padding, and the new message.
     // A real attacker wouldn't know the length of the original message. They can try a wide range of lengths,
     // though, and submit all MACs to the server.
     let forged_length = (8 * padded_msg.len()) as u64;
-    let forged_padded = auth::pad_msg(new_message.to_vec(), Some(forged_length));
+    let forged_padded = hash::pad_msg(new_message.to_vec(), Some(forged_length));
     let forged_hash = sha1_forger.compute(&forged_padded);
     assert_eq!(forged_hash, goal_hash);
     println!("Hashes match: {:?}=={:?}", forged_hash, goal_hash);
