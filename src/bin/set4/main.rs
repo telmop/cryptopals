@@ -181,22 +181,21 @@ fn sha1_mac(msg: &[u8], key: &[u8]) -> [u8; 20] {
 }
 
 fn challenge28() {
-    let sha1_hash = sha1_mac("secure message".as_bytes(), "secret key".as_bytes());
+    let sha1_hash = sha1_mac(b"secure message", b"secret key");
     println!("{:?}", sha1_hash);
 }
 
 fn challenge29() {
-    let orig_msg =
-        "comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon".as_bytes();
-    let key = "secret key".as_bytes();
-    let new_message = ";admin=true".as_bytes();
+    let orig_msg = b"comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon";
+    let key = b"secret key";
+    let new_message = b";admin=true";
 
     // First find out what the goal hash is. Ie, the hash that we would get if we passed
     // sha1 the key, the original message, the padding, and the new message.
     let padded_msg = {
         let mut tmp = key.to_vec();
         tmp.extend_from_slice(orig_msg);
-        let mut padded = hash::pad_msg(tmp.to_vec(), None);
+        let mut padded = hash::Sha1::pad_msg(tmp.to_vec(), None);
         padded.extend_from_slice(new_message);
         padded
     };
@@ -218,10 +217,52 @@ fn challenge29() {
     // A real attacker wouldn't know the length of the original message. They can try a wide range of lengths,
     // though, and submit all MACs to the server.
     let forged_length = (8 * padded_msg.len()) as u64;
-    let forged_padded = hash::pad_msg(new_message.to_vec(), Some(forged_length));
+    let forged_padded = hash::Sha1::pad_msg(new_message.to_vec(), Some(forged_length));
     let forged_hash = sha1_forger.compute(&forged_padded);
     assert_eq!(forged_hash, goal_hash);
-    println!("Hashes match: {:?}=={:?}", forged_hash, goal_hash);
+    println!("Hashes match: {:?} == {:?}", forged_hash, goal_hash);
+}
+
+fn md4_mac(msg: &[u8], key: &[u8]) -> [u8; 16] {
+    let mut input = key.to_vec();
+    input.extend_from_slice(msg);
+    let md4 = hash::Md4::new();
+    md4.compute(&input)
+}
+
+// Pretty much the same as challenge 29 but using MD4.
+fn challenge30() {
+    let orig_msg = b"comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon";
+    let key = b"secret key";
+    let new_message = b";admin=true";
+
+    // First find out what the goal hash is. Ie, the hash that we would get if we passed
+    // md4 the key, the original message, the padding, and the new message.
+    let padded_msg = {
+        let mut tmp = key.to_vec();
+        tmp.extend_from_slice(orig_msg);
+        let mut padded = hash::Md4::pad_msg(tmp.to_vec(), None);
+        padded.extend_from_slice(new_message);
+        padded
+    };
+    let md4 = hash::Md4::new();
+    let goal_hash = md4.compute(&padded_msg);
+
+    // Now compute the actual hash with just the original message.
+    let hash = md4_mac(orig_msg, key);
+
+    // Initialize the forger md4. Notice the lower-endianness.
+    let a = u32::from_le_bytes(hash[0..4].try_into().unwrap());
+    let b = u32::from_le_bytes(hash[4..8].try_into().unwrap());
+    let c = u32::from_le_bytes(hash[8..12].try_into().unwrap());
+    let d = u32::from_le_bytes(hash[12..16].try_into().unwrap());
+    let md4_forger = hash::Md4::init(a, b, c, d);
+
+    let forged_length = (8 * padded_msg.len()) as u64;
+    let forged_padded = hash::Md4::pad_msg(new_message.to_vec(), Some(forged_length));
+    let forged_hash = md4_forger.compute(&forged_padded);
+    assert_eq!(forged_hash, goal_hash);
+    println!("Hashes match: {:?} == {:?}", forged_hash, goal_hash);
 }
 
 fn main() {
@@ -231,6 +272,7 @@ fn main() {
         challenge27,
         challenge28,
         challenge29,
+        challenge30,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 25);
