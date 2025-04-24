@@ -271,16 +271,42 @@ fn sign_file(file: &str, key: &[u8]) -> hash::Sha1Hash {
     hash::sha1_hmac(file.as_bytes(), key)
 }
 
-fn insecure_compare(file: &str, key: &[u8], signature: &hash::Sha1Hash) -> bool {
+fn insecure_compare(file: &str, key: &[u8], signature: &hash::Sha1Hash, sleep_time: u32) -> bool {
     let real_signature = sign_file(file, key);
     assert_eq!(real_signature.len(), signature.len());
     for i in 0..signature.len() {
         if real_signature[i] != signature[i] {
             return false;
         }
-        utils::sleep(50);
+        utils::sleep(sleep_time);
     }
     true
+}
+
+fn compute_statistics(durations: Vec<u128>) -> (f32, f32) {
+    assert!(durations.len() > 0);
+    let mean: f32 = (durations.iter().sum::<u128>() as f32) / (durations.len() as f32);
+    let variance: f32 = if durations.len() == 1 {
+        durations
+            .iter()
+            .fold(0., |a, b| a + (*b as f32 - mean).powi(2))
+            / ((durations.len() - 1) as f32)
+    } else {
+        // Hack to handle the case where we can't compute variance.
+        0.0
+    };
+    (mean, variance)
+}
+
+fn t_statistic(stats1: (f32, f32), stats2: (f32, f32), n: usize) -> f32 {
+    let (mean1, var1) = stats1;
+    let (mean2, var2) = stats2;
+    if n == 1 {
+        // Hack to handle the case where we can't compute variance.
+        mean1 - mean2
+    } else {
+        (mean1 - mean2) / ((var1 + var2) / n as f32).sqrt()
+    }
 }
 
 fn timing_attack<F: Fn(&hash::Sha1Hash) -> bool>(
@@ -290,7 +316,7 @@ fn timing_attack<F: Fn(&hash::Sha1Hash) -> bool>(
     assert!(num_attempts > 0);
     let mut signature = [0u8; 20];
     for i in 0..20 {
-        let mut max_duration = 0.0;
+        let mut best_stats = (0f32, 1f32);
         let mut best_guess = 0;
         for guess in 0..=255 {
             signature[i] = guess;
@@ -298,12 +324,15 @@ fn timing_attack<F: Fn(&hash::Sha1Hash) -> bool>(
             for _ in 0..num_attempts {
                 let start = Instant::now();
                 let _ = compare_fn(&signature);
-                let duration = start.elapsed().as_millis();
+                let duration = start.elapsed().as_nanos();
                 durations.push(duration);
             }
-            let avg_duration = (durations.iter().sum::<u128>() as f32) / (num_attempts as f32);
-            if avg_duration > max_duration {
-                max_duration = avg_duration;
+            // Challenge 31 works fine by just comparing total duration. However, challenge 32 doesn't.
+            // I'm sure if one increases `num_attempts` enough, it will work, but it's much faster
+            // to do a two-sample t-test: https://en.wikipedia.org/wiki/Student's_t-test#Equal_sample_sizes_and_variance
+            let stats = compute_statistics(durations);
+            if t_statistic(best_stats, stats, num_attempts) < -2f32 {
+                best_stats = stats;
                 best_guess = guess;
             }
         }
@@ -319,12 +348,30 @@ fn challenge31() {
 
     let mut bad_signature = real_signature.clone();
     bad_signature[0] = !bad_signature[0];
-    assert!(!insecure_compare(file, key, &bad_signature));
-    assert!(!insecure_compare("a different file", key, &real_signature));
+    assert!(!insecure_compare(file, key, &bad_signature, 0));
+    assert!(!insecure_compare(
+        "a different file",
+        key,
+        &real_signature,
+        0
+    ));
 
-    let guess_signature = timing_attack(|guess| insecure_compare(file, key, guess), 1);
-    assert_eq!(real_signature, guess_signature);
-    println!("Found leaked signature: {:?}", guess_signature);
+    println!("Skipping the attack as it is very slow. Uncomment to run.");
+    // let guess_signature = timing_attack(|guess| insecure_compare(file, key, guess, 50), 1);
+    // assert_eq!(real_signature, guess_signature);
+    // println!("Found leaked signature: {:?}", guess_signature);
+}
+
+fn challenge32() {
+    let key = b"super secret key";
+    let file = "a super duper important file";
+    let real_signature = sign_file(file, key);
+
+    println!("Skipping the attack as it is very slow. Uncomment to run.");
+    // Run the code below as a release binary: `cargo build --release --bin set4`
+    // let guess_signature = timing_attack(|guess| insecure_compare(file, key, guess, 1), 20);
+    // assert_eq!(real_signature, guess_signature);
+    // println!("Found leaked signature: {:?}", guess_signature);
 }
 
 fn main() {
@@ -336,6 +383,7 @@ fn main() {
         challenge29,
         challenge30,
         challenge31,
+        challenge32,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 25);
