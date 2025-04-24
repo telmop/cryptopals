@@ -2,7 +2,9 @@ use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
 use cryptopals::hash;
+use cryptopals::utils;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
@@ -173,7 +175,7 @@ fn challenge27() {
     }
 }
 
-fn sha1_mac(msg: &[u8], key: &[u8]) -> [u8; 20] {
+fn sha1_mac(msg: &[u8], key: &[u8]) -> hash::Sha1Hash {
     let mut input = key.to_vec();
     input.extend_from_slice(msg);
     let sha1 = hash::Sha1::new();
@@ -223,7 +225,7 @@ fn challenge29() {
     println!("Hashes match: {:?} == {:?}", forged_hash, goal_hash);
 }
 
-fn md4_mac(msg: &[u8], key: &[u8]) -> [u8; 16] {
+fn md4_mac(msg: &[u8], key: &[u8]) -> hash::Md4Hash {
     let mut input = key.to_vec();
     input.extend_from_slice(msg);
     let md4 = hash::Md4::new();
@@ -265,6 +267,66 @@ fn challenge30() {
     println!("Hashes match: {:?} == {:?}", forged_hash, goal_hash);
 }
 
+fn sign_file(file: &str, key: &[u8]) -> hash::Sha1Hash {
+    hash::sha1_hmac(file.as_bytes(), key)
+}
+
+fn insecure_compare(file: &str, key: &[u8], signature: &hash::Sha1Hash) -> bool {
+    let real_signature = sign_file(file, key);
+    assert_eq!(real_signature.len(), signature.len());
+    for i in 0..signature.len() {
+        if real_signature[i] != signature[i] {
+            return false;
+        }
+        utils::sleep(50);
+    }
+    true
+}
+
+fn timing_attack<F: Fn(&hash::Sha1Hash) -> bool>(
+    compare_fn: F,
+    num_attempts: usize,
+) -> hash::Sha1Hash {
+    assert!(num_attempts > 0);
+    let mut signature = [0u8; 20];
+    for i in 0..20 {
+        let mut max_duration = 0.0;
+        let mut best_guess = 0;
+        for guess in 0..=255 {
+            signature[i] = guess;
+            let mut durations = vec![];
+            for _ in 0..num_attempts {
+                let start = Instant::now();
+                let _ = compare_fn(&signature);
+                let duration = start.elapsed().as_millis();
+                durations.push(duration);
+            }
+            let avg_duration = (durations.iter().sum::<u128>() as f32) / (num_attempts as f32);
+            if avg_duration > max_duration {
+                max_duration = avg_duration;
+                best_guess = guess;
+            }
+        }
+        signature[i] = best_guess;
+    }
+    signature
+}
+
+fn challenge31() {
+    let key = b"super secret key";
+    let file = "a super duper important file";
+    let real_signature = sign_file(file, key);
+
+    let mut bad_signature = real_signature.clone();
+    bad_signature[0] = !bad_signature[0];
+    assert!(!insecure_compare(file, key, &bad_signature));
+    assert!(!insecure_compare("a different file", key, &real_signature));
+
+    let guess_signature = timing_attack(|guess| insecure_compare(file, key, guess), 1);
+    assert_eq!(real_signature, guess_signature);
+    println!("Found leaked signature: {:?}", guess_signature);
+}
+
 fn main() {
     let challenges = [
         challenge25,
@@ -273,6 +335,7 @@ fn main() {
         challenge28,
         challenge29,
         challenge30,
+        challenge31,
     ];
     for (i, challenge) in challenges.iter().enumerate() {
         println!("Running challenge {}", i + 25);

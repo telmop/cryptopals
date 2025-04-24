@@ -1,4 +1,8 @@
+use crate::encryption;
+
 const BLOCK_SIZE: usize = 64;
+pub type Sha1Hash = [u8; 20];
+pub type Md4Hash = [u8; 16];
 
 pub struct Sha1 {
     h0: u32,
@@ -46,7 +50,7 @@ impl Sha1 {
     }
 
     // From https://en.wikipedia.org/wiki/SHA-1#SHA-1_pseudocode
-    pub fn compute(&self, bytes: &[u8]) -> [u8; 20] {
+    pub fn compute(&self, bytes: &[u8]) -> Sha1Hash {
         let padded_bytes = if self.apply_padding {
             Self::pad_msg(bytes.to_vec(), None)
         } else {
@@ -157,7 +161,7 @@ impl Md4 {
     }
 
     // From https://tools.ietf.org/html/rfc1320
-    pub fn compute(&self, bytes: &[u8]) -> [u8; 16] {
+    pub fn compute(&self, bytes: &[u8]) -> Md4Hash {
         let padded_bytes = if self.apply_padding {
             Self::pad_msg(bytes.to_vec(), None)
         } else {
@@ -309,6 +313,36 @@ impl Md4 {
         msg.extend(length.to_le_bytes());
         msg
     }
+}
+
+// Just a convenience method. Useful when we want to compute many SHA1's.
+fn compute_sha1(bytes: &[u8]) -> Sha1Hash {
+    let sha1 = Sha1::new();
+    sha1.compute(bytes)
+}
+
+// From: https://en.wikipedia.org/wiki/HMAC#Implementation
+pub fn sha1_hmac(message: &[u8], key: &[u8]) -> Sha1Hash {
+    let block_sized_key = compute_block_sized_key(key);
+    let mut o_key_pad = encryption::xor(&block_sized_key, &[0x5c; BLOCK_SIZE]);
+    let mut i_key_pad = encryption::xor(&block_sized_key, &[0x36; BLOCK_SIZE]);
+
+    i_key_pad.extend_from_slice(message);
+    let intermediate = compute_sha1(&i_key_pad);
+    o_key_pad.extend(intermediate);
+    compute_sha1(&o_key_pad)
+}
+
+fn compute_block_sized_key(key: &[u8]) -> Vec<u8> {
+    let mut new_key = key.to_vec();
+    if key.len() > BLOCK_SIZE {
+        let sha1 = Sha1::new();
+        new_key = sha1.compute(&new_key).to_vec();
+    }
+    if new_key.len() < BLOCK_SIZE {
+        new_key.extend(vec![0u8; BLOCK_SIZE - new_key.len()]);
+    }
+    new_key
 }
 
 #[test]

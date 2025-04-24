@@ -9,3 +9,8 @@ pub fn count_unique_blocks(bytes: &[u8], block_size: usize) -> usize {
     }
     unique_blocks.len()
 }
+
+pub fn sleep(time: u32) {
+    let wait_time = std::time::Duration::from_millis(time as u64);
+    std::thread::sleep(wait_time);
+}

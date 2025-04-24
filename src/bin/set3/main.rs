@@ -3,6 +3,7 @@ use cryptopals::encoding;
 use cryptopals::encryption;
 use cryptopals::encryption::AES128_BLOCK_SIZE;
 use cryptopals::random;
+use cryptopals::utils;
 use rand::prelude::{IteratorRandom, Rng};
 use std::cmp;
 use std::fs::File;
@@ -230,11 +231,6 @@ fn challenge21() {
     assert_eq!(rng.random(), 2357136044);
 }
 
-fn sleep(time: u32) {
-    let wait_time = std::time::Duration::from_secs(time as u64);
-    std::thread::sleep(wait_time);
-}
-
 fn get_timestamp_seconds() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -247,7 +243,7 @@ fn gen_random_with_wait(min_wait: u32, max_wait: u32, fake_wait: bool) -> (u32, 
     let wait1 = rng.random_range(min_wait..=max_wait);
     let dt;
     if !fake_wait {
-        sleep(wait1);
+        utils::sleep(wait1 * 1000);
         dt = 0;
     } else {
         dt = wait1;
@@ -255,7 +251,7 @@ fn gen_random_with_wait(min_wait: u32, max_wait: u32, fake_wait: bool) -> (u32, 
     let seed = get_timestamp_seconds() as u32 - dt;
     let mut mt = random::MT19937::new(seed);
     if !fake_wait {
-        sleep(rng.random_range(min_wait..=max_wait));
+        utils::sleep(rng.random_range(min_wait..=max_wait) * 1000);
     }
     (mt.random(), seed)
 }
