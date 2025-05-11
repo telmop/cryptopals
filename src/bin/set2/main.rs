@@ -31,10 +31,10 @@ fn detect_ecb(ciphertext: &[u8], block_size: usize) -> bool {
 }
 
 fn random_encrypt(ciphertext: &[u8]) -> (Vec<u8>, bool) {
-    let mut rng = rand::rng();
-    let num_bytes_before: usize = rng.random_range(5..=10);
+    let mut rng = rand::thread_rng();
+    let num_bytes_before: usize = rng.gen_range(5..=10);
     let bytes_before = encryption::get_random_bytes(num_bytes_before);
-    let num_bytes_after: usize = rng.random_range(5..=10);
+    let num_bytes_after: usize = rng.gen_range(5..=10);
     let bytes_after = encryption::get_random_bytes(num_bytes_after);
     let mut cipher_vec = Vec::with_capacity(ciphertext.len() + num_bytes_before + num_bytes_after);
     cipher_vec.extend(bytes_before);
@@ -42,7 +42,7 @@ fn random_encrypt(ciphertext: &[u8]) -> (Vec<u8>, bool) {
     cipher_vec.extend(bytes_after);
 
     let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
-    if rng.random() {
+    if rand::random() {
         // CBC.
         let iv = encryption::get_random_bytes(AES128_BLOCK_SIZE);
         (
@@ -237,8 +237,8 @@ fn challenge13() {
 }
 
 fn challenge14() {
-    let mut rng = rand::rng();
-    let prefix_size = rng.random_range(5..=20);
+    let mut rng = rand::thread_rng();
+    let prefix_size = rng.gen_range(5..=20);
     let prefix = encryption::get_random_bytes(prefix_size);
     let key = encryption::get_random_bytes(AES128_BLOCK_SIZE);
 

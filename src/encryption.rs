@@ -1,4 +1,5 @@
 use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
+use rand::Rng;
 use std::cmp;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
@@ -97,7 +98,8 @@ pub fn decrypt_aes_cbc(ciphertext: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
 
 pub fn get_random_bytes(num_bytes: usize) -> Vec<u8> {
     let mut bytes = vec![0u8; num_bytes];
-    rand::fill(&mut bytes[..]);
+    let mut rng = rand::thread_rng();
+    rng.fill(&mut bytes[..]);
     bytes.to_vec()
 }
 

@@ -29,7 +29,7 @@ fn encrypt_random_message(key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let msgs = b64_strs
         .into_iter()
         .map(|b64_str| encoding::b64decode(b64_str).unwrap());
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
     let msg = msgs.choose(&mut rng).unwrap();
     println!("Original: {}", std::str::from_utf8(&msg).unwrap());
     encryption::encrypt_aes_cbc(&msg, key, iv)
@@ -239,8 +239,8 @@ fn get_timestamp_seconds() -> u64 {
 }
 
 fn gen_random_with_wait(min_wait: u32, max_wait: u32, fake_wait: bool) -> (u32, u32) {
-    let mut rng = rand::rng();
-    let wait1 = rng.random_range(min_wait..=max_wait);
+    let mut rng = rand::thread_rng();
+    let wait1 = rng.gen_range(min_wait..=max_wait);
     let dt;
     if !fake_wait {
         utils::sleep(wait1 * 1000);
@@ -251,7 +251,7 @@ fn gen_random_with_wait(min_wait: u32, max_wait: u32, fake_wait: bool) -> (u32, 
     let seed = get_timestamp_seconds() as u32 - dt;
     let mut mt = random::MT19937::new(seed);
     if !fake_wait {
-        utils::sleep(rng.random_range(min_wait..=max_wait) * 1000);
+        utils::sleep(rng.gen_range(min_wait..=max_wait) * 1000);
     }
     (mt.random(), seed)
 }
@@ -321,8 +321,7 @@ fn challenge24() {
     // Part 1: validate encryption works.
     {
         let msg = "This is a relatively short secret message...".as_bytes();
-        let mut rng = rand::rng();
-        let seed: u16 = rng.random();
+        let seed: u16 = rand::random();
         let encrypted = mt19937_one_time_pad(msg, seed);
         // Decrypt function is the same, since this is a xor.
         let decrypted = mt19937_one_time_pad(&encrypted, seed);
@@ -331,9 +330,9 @@ fn challenge24() {
 
     // Part 2: break u16 key.
     {
-        let mut rng = rand::rng();
-        let seed: u16 = rng.random();
-        let prefix_size: usize = rng.random_range(5..=20);
+        let mut rng = rand::thread_rng();
+        let seed: u16 = rand::random();
+        let prefix_size: usize = rng.gen_range(5..20);
         let mut msg = encryption::get_random_bytes(prefix_size);
         msg.extend(vec![b'A'; 14]);
         let encrypted = mt19937_one_time_pad(&msg, seed);
