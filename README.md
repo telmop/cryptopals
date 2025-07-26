@@ -1,0 +1,3 @@
+# cryptopals
+
+Cryptopals in Rust
